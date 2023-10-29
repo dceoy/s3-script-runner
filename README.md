@@ -51,3 +51,12 @@ Installation
         --params ProjectName=ssr-dev,IamStackName=ssr-dev-s3-bucket-and-iam-resources,VpcStackName=ssr-dev-vpc-private-subnets-with-gateway-endpoints,NumberOfAvailabilityZones=1 \
         batch-environments-and-queues.cfn.yml ssr-dev-batch-environments-and-queues
     ```
+
+7.  Deploy stacks for ECR and CodeBuild.
+
+    ```sh
+    $ rain deploy \
+        --params ProjectName=ssr-dev,IamStackName=ssr-dev-s3-bucket-and-iam-resources \
+        ecr-repository-and-codebuild-project.cfn.yml \
+        ssr-dev-ecr-repository-and-codebuild-project
+    ```

@@ -206,6 +206,77 @@ Resources:
                 Condition:
                   StringEquals:
                     aws:ResourceTag/ProjectName: !Ref ProjectName
+  CodeBuildServiceIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-CodeBuildServiceIamRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+      Path: /service-role/
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-codebuild-service-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codecommit:GitPull
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeRepositories
+                  - ecr:GetAuthorizationToken
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-CodeBuildServiceIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  CodeBuildEventsIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-CodeBuildEventsIamRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service:
+                - events.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-codebuild-execution-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: '*'
+                Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-CodeBuildEventsIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
 Outputs:
   S3Bucket:
     Value: !Ref S3Bucket
@@ -227,3 +298,11 @@ Outputs:
     Value: !GetAtt UserIamGroup.Arn
     Export:
       Name: !Sub ${AWS::Region}-${AWS::StackName}-UserIamGroup
+  CodeBuildServiceIamRole:
+    Value: !GetAtt CodeBuildServiceIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-CodeBuildServiceIamRole
+  CodeBuildEventsIamRole:
+    Value: !GetAtt CodeBuildEventsIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-CodeBuildEventsIamRole

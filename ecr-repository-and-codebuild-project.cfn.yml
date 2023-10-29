@@ -1,0 +1,213 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: CodeBuild project to build and push Docker images to ECR
+Parameters:
+  ProjectName:
+    Description: Set the project name.
+    Type: String
+    Default: ssr
+  EcrRepositoryName:
+    Description: Set the ECR repository name.
+    Type: String
+    Default: command-on-s3
+  IamStackName:
+    Description: Set the IAM stack name.
+    Type: String
+    Default: s3-bucket-and-iam-resources
+  DefaultImageTag:
+    Description: Set the default container image tag.
+    Type: String
+    Default: latest
+  CodeCommitBranch:
+    Description: Set the CodeCommit branch.
+    Type: String
+    Default: main
+  DockerfileName:
+    Description: Set the Dockerfile name.
+    Type: String
+    Default: Dockerfile
+  DockerBuildContext:
+    Description: Set the Docker build context.
+    Type: String
+    Default: .
+  DockerBuildArg:
+    Description: Set the Docker build-time variables.
+    Type: String
+    Default: ''
+  DockerHubUser:
+    Description: Set the Docker Hub user.
+    Type: String
+    Default: ''
+  DockerHubToken:
+    Description: Set the Docker Hub token.
+    Type: String
+    Default: ''
+  CodeBuildEnvironmentType:
+    Description: Set the CodeBuild environment type.
+    Type: String
+    Default: LINUX_CONTAINER
+  CodeBuildEnvironmentComputeType:
+    Description: Set the CodeBuild environment compute type.
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+  CodeBuildEnvironmentImage:
+    Description: Set the CodeBuild environment image.
+    Type: String
+    Default: aws/codebuild/standard:7.0
+Resources:
+  EcrRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref EcrRepositoryName
+      ImageTagMutability: MUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      Tags:
+        - Key: Name
+          Value: !Ref EcrRepositoryName
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  CodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref EcrRepositoryName
+      Tags:
+        - Key: Name
+          Value: !Ref EcrRepositoryName
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${ProjectName}-codebuild-project
+      ServiceRole:
+        Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-CodeBuildServiceRole
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: !Ref CodeBuildEnvironmentType
+        ComputeType: !Ref CodeBuildEnvironmentComputeType
+        Image: !Ref CodeBuildEnvironmentImage
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Value: !Ref EcrRepository
+          - Name: IMAGE_TAG
+            Value: !Ref DefaultImageTag
+          - Name: DOCKERFILE_NAME
+            Value: !Ref DockerfileName
+          - Name: DOCKER_BUILD_CONTEXT
+            Value: !Ref DockerBuildContext
+          - Name: DOCKER_BUILD_ARG
+            Value: !Ref DockerBuildArg
+          - Name: DOCKERHUB_USER
+            Value: !Ref DockerHubUser
+          - Name: DOCKERHUB_TOKEN
+            Value: !Ref DockerHubToken
+      Source:
+        Type: CODECOMMIT
+        Location: !GetAtt CodeCommitRepository.Arn
+        GitCloneDepth: 1
+        GitSubmodulesConfig:
+          FetchSubmodules: true
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo 'Validating variables...'
+                - echo "  IMAGE_REPO_NAME  <-  ${IMAGE_REPO_NAME}" && test -n "${IMAGE_REPO_NAME}"
+                - echo "  IMAGE_TAG        <-  ${IMAGE_TAG}" && test -n "${IMAGE_TAG}"
+                - echo 'Check Amazon ECR repository...'
+                - aws ecr describe-repositories --repository-names "${IMAGE_REPO_NAME}"
+                - echo 'Logging in to Amazon ECR...'
+                - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+                - |
+                  if [ -n "${DOCKERHUB_USER}" ] && [ -n "${DOCKERHUB_TOKEN}" ]; then
+                    echo 'Logging in to Docker Hub...'
+                    echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USER}" --password-stdin
+                  fi
+            build:
+              commands:
+                - echo "Build started on $(date)"
+                - echo 'Building the Docker image...'
+                - docker image build -t "${IMAGE_REPO_NAME}:${IMAGE_TAG}" -f "${DOCKER_BUILD_CONTEXT%/}/${DOCKERFILE_NAME}" $(test -z "${DOCKER_BUILD_ARG}" || echo "--build-arg ${DOCKER_BUILD_ARG}") "${DOCKER_BUILD_CONTEXT}"
+                - docker image tag "${IMAGE_REPO_NAME}:${IMAGE_TAG}" "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+                - docker image tag "${IMAGE_REPO_NAME}:${IMAGE_TAG}" "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+            post_build:
+              commands:
+                - echo "Build completed on $(date)"
+                - echo 'Pushing the Docker image...'
+                - docker image push "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+                - docker image push "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
+      SourceVersion: !Sub refs/heads/${CodeCommitBranch}
+      TimeoutInMinutes: 60
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref CodeBuildLogGroup
+          Status: ENABLED
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-codebuild-project
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  CodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/${ProjectName}-codebuild-project
+      RetentionInDays: 14
+      Tags:
+        - Key: Name
+          Value: !Sub /aws/codebuild/${ProjectName}-codebuild-project
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  CodeBuildEventsRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${ProjectName}-codebuild-events-rule
+      EventPattern:
+        source:
+          - aws.codecommit
+        detail-type:
+          - CodeCommit Repository State Change
+        resources:
+          - !GetAtt CodeCommitRepository.Arn
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceType:
+            - branch
+          referenceName:
+            - !Ref CodeCommitBranch
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CodeBuildProject.Arn
+          RoleArn:
+            Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-CodeBuildEventsRole
+          Id: !Sub ${ProjectName}-codecommit-to-codebuild
+Outputs:
+  CodeCommitRepository:
+    Value: !Ref CodeCommitRepository
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-CodeCommitRepository
+  EcrRepository:
+    Value: !Ref EcrRepository
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-EcrRepository
+  CodeBuildProject:
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-CodeBuildProject
+  CodeBuildLogGroup:
+    Value: !Ref CodeBuildLogGroup
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-CodeBuildLogGroup
+  CodeBuildEventsRule:
+    Value: !Ref CodeBuildEventsRule
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-CodeBuildEventsRule
