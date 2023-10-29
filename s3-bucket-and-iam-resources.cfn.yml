@@ -1,0 +1,229 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: S3 bucket and IAM resources
+Parameters:
+  ProjectName:
+    Description: Set the project name.
+    Type: String
+    Default: ssr
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    # DeletionPolicy: Retain
+    # UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub ${ProjectName}-main-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: Move-to-Intelligent-Tiering-after-0day
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 0
+                StorageClass: INTELLIGENT_TIERING
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-${AWS::Region}-${AWS::AccountId}
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  S3AccessIamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-s3-access-policy
+      Roles:
+        - !Ref BatchJobIamRole
+      Groups:
+        - !Ref UserIamGroup
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:Describe*
+              - s3:List*
+              - s3:Get*
+              - s3:*Object*
+              - s3:*MultipartUpload*
+              - s3-object-lambda:List*
+              - s3-object-lambda:Get*
+              - s3-object-lambda:*Object*
+              - s3-object-lambda:*MultipartUpload*
+            Resource:
+              - !GetAtt S3Bucket.Arn
+              - Fn::Join:
+                  - ''
+                  - - !GetAtt S3Bucket.Arn
+                    - /*
+  BatchServiceIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-BatchServiceIamRole
+      Path: /service-role/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - batch.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-BatchServiceIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  BatchJobIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-BatchJobIamRole
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-BatchJobIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  BatchJobExecutionIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-BatchJobExecutionIamRole
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-BatchJobExecutionIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  UserIamGroup:
+    Type: AWS::IAM::Group
+    Properties:
+      GroupName: !Sub ${ProjectName}-iam-group
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
+        - arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess
+        - arn:aws:iam::aws:policy/AWSBillingReadOnlyAccess
+        - arn:aws:iam::aws:policy/AWSBudgetsReadOnlyAccess
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-iam-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService:
+                      - ecs-tasks.amazonaws.com
+                  StringEquals:
+                    aws:ResourceTag/ProjectName: !Ref ProjectName
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService:
+                      - ecs-tasks.amazonaws.com
+                  'Null':
+                    aws:ResourceTag/ProjectName: 'true'
+        - PolicyName: !Sub ${ProjectName}-ecr-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:CreateRepository
+                  - ecr:DeleteRepository
+                  - ecr:DeleteRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:GetRepositoryPolicy
+                  - ecr:SetRepositoryPolicy
+                  - ecr:TagResource
+                  - ecr:UntagResource
+                Resource: '*'
+        - PolicyName: !Sub ${ProjectName}-batch-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - batch:Describe*
+                  - batch:List*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - batch:RegisterJobDefinition
+                  - batch:DeregisterJobDefinition
+                  - batch:TagResource
+                  - batch:UntagResource
+                Resource:
+                  - !Sub arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/*
+              - Effect: Allow
+                Action:
+                  - batch:SubmitJob
+                  - batch:CancelJob
+                  - batch:TerminateJob
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:ResourceTag/ProjectName: !Ref ProjectName
+Outputs:
+  S3Bucket:
+    Value: !Ref S3Bucket
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-S3Bucket
+  BatchServiceIamRoleArn:
+    Value: !GetAtt BatchServiceIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchServiceIamRoleArn
+  BatchJobIamRoleArn:
+    Value: !GetAtt BatchJobIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobIamRoleArn
+  BatchJobExecutionIamRoleArn:
+    Value: !GetAtt BatchJobExecutionIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobExecutionIamRoleArn
+  UserIamGroup:
+    Value: !GetAtt UserIamGroup.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-UserIamGroup

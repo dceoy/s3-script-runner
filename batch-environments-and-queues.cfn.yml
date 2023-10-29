@@ -1,0 +1,145 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Batch environments and queues
+Parameters:
+  ProjectName:
+    Description: Set the project name.
+    Type: String
+    Default: ssr
+  IamStackName:
+    Description: Set the IAM stack name.
+    Type: String
+    Default: s3-bucket-and-iam-resources
+  VpcStackName:
+    Description: Set the VPC stack name.
+    Type: String
+    Default: vpc-private-subnets-with-gateway-endpoints
+  NumberOfAvailabilityZones:
+    Description: Set the number of availability zones.
+    Type: Number
+    Default: 1
+    AllowedValues:
+      - 1
+      - 2
+      - 3
+Condition:
+  UseAvailabilityZone1:
+    Fn::Or:
+      - Fn::Equals:
+          - !Ref NumberOfAvailabilityZones
+          - 2
+      - !Condition UseAvailabilityZone2
+  UseAvailabilityZone2:
+    Fn::Equals:
+      - !Ref NumberOfAvailabilityZones
+      - 3
+Resources:
+  BatchComputeEnvironmentFargateIntelSpot:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ComputeEnvironmentName: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-spot
+      ComputeResources:
+        MaxvCpus: 2048
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-DefaultSecurityGroup
+        Type: FARGATE_SPOT
+        Subnets:
+          Fn::If:
+            - UseAvailabilityZone2
+            - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+              - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet1
+              - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet2
+            - Fn::If:
+                - UseAvailabilityZone1
+                - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+                  - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet1
+                - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+      ServiceRole:
+        Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchServiceIamRoleArn
+      State: ENABLED
+      Tags:
+        Name: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-spot
+        ProjectName: !Ref ProjectName
+  BatchJobQueueFargateIntelSpot:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub ${ProjectName}-batch-job-queue-fargate-intel-spot
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref BatchComputeEnvironmentFargateIntelSpot
+      Priority: 1
+      State: ENABLED
+      Tags:
+        Name: !Sub ${ProjectName}-batch-job-queue-fargate-intel-spot
+        ProjectName: !Ref ProjectName
+  BatchComputeEnvironmentFargateIntelOnDemand:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ComputeEnvironmentName: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-ondemand
+      ComputeResources:
+        MaxvCpus: 2048
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-DefaultSecurityGroup
+        Type: FARGATE
+        Subnets:
+          Fn::If:
+            - UseAvailabilityZone2
+            - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+              - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet1
+              - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet2
+            - Fn::If:
+                - UseAvailabilityZone1
+                - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+                  - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet1
+                - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+      ServiceRole:
+        Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchServiceIamRoleArn
+      State: ENABLED
+      Tags:
+        Name: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-ondemand
+        ProjectName: !Ref ProjectName
+  BatchJobQueueFargateIntelOnDemand:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub ${ProjectName}-batch-job-queue-fargate-intel-ondemand
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref BatchComputeEnvironmentFargateIntelOnDemand
+      Priority: 1
+      State: ENABLED
+      Tags:
+        Name: !Sub ${ProjectName}-batch-job-queue-fargate-intel-ondemand
+        ProjectName: !Ref ProjectName
+  BatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/batch/${ProjectName}-batch-job
+      RetentionInDays: 14
+      Tags:
+        - Key: Name
+          Value: !Sub /aws/batch/${ProjectName}-batch-job
+        - Key: ProjectName
+          Value: !Ref ProjectName
+Outputs:
+  BatchComputeEnvironmentFargateIntelSpot:
+    Value: !Ref BatchComputeEnvironmentFargateIntelSpot
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchComputeEnvironmentFargateIntelSpot
+  BatchJobQueueFargateIntelSpot:
+    Value: !Ref BatchJobQueueFargateIntelSpot
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobQueueFargateIntelSpot
+  BatchComputeEnvironmentFargateIntelOnDemand:
+    Value: !Ref BatchComputeEnvironmentFargateIntelOnDemand
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchComputeEnvironmentFargateIntelOnDemand
+  BatchJobQueueFargateIntelOnDemand:
+    Value: !Ref BatchJobQueueFargateIntelOnDemand
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobQueueFargateIntelOnDemand
+  BatchLogGroup:
+    Value: !Ref BatchLogGroup
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchLogGroup
