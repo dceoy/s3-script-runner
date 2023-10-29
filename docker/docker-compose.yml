@@ -1,0 +1,17 @@
+---
+version: '3'
+
+services:
+  executor-on-s3:
+    container_name: executor-on-s3
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dceoy/executor-on-s3:latest
+    user: ${UID}:${GID}
+    userns_mode: host
+    volumes:
+      - .:/wd
+    working_dir: /wd
+    entrypoint:
+      - /usr/local/bin/executor-on-s3

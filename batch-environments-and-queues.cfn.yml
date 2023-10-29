@@ -22,7 +22,7 @@ Parameters:
       - 1
       - 2
       - 3
-Condition:
+Conditions:
   UseAvailabilityZone1:
     Fn::Or:
       - Fn::Equals:

@@ -9,7 +9,7 @@ Parameters:
   EcrRepositoryName:
     Description: Set the ECR repository name.
     Type: String
-    Default: command-on-s3
+    Default: executor-on-s3
   IamStackName:
     Description: Set the IAM stack name.
     Type: String
@@ -29,7 +29,7 @@ Parameters:
   DockerBuildContext:
     Description: Set the Docker build context.
     Type: String
-    Default: .
+    Default: ./docker
   DockerBuildArg:
     Description: Set the Docker build-time variables.
     Type: String
