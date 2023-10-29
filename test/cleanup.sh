@@ -14,4 +14,5 @@ aws s3api list-object-versions \
   | jq -rc '.Versions[], .DeleteMarkers[] | .Key, .VersionId' \
   | xargs -L2 bash -xc \
     "aws s3api delete-object --bucket ${MOUNT_S3_BUCKET} --key \${0} --version-id \${1}" || :
-rm -f tmp.*
+
+cd "$(dirname "${0}")" && rm -f tmp.*

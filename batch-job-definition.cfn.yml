@@ -35,23 +35,23 @@ Resources:
           - Name: MOUNT_S3_DIRECTORY
             Value: /mnt/s3
         ReadonlyRootFilesystem: false
-        # Privileged: true
+        Privileged: true
         User: root
         ResourceRequirements:
           - Type: VCPU
-            Value: 0.25
+            Value: 1
           - Type: MEMORY
-            Value: 512
-        EphemeralStorage:
-          SizeInGiB: 200
-        NetworkConfiguration:
-          AssignPublicIp: DISABLED
-        FargatePlatformConfiguration:
-          PlatformVersion: LATEST
-        # LinuxParameters:
-        #   Devices:
-        #     - ContainerPath: /dev/fuse
-        #       HostPath: /dev/fuse
+            Value: 2048
+        # NetworkConfiguration:
+        #   AssignPublicIp: DISABLED
+        # EphemeralStorage:
+        #   SizeInGiB: 200
+        # FargatePlatformConfiguration:
+        #   PlatformVersion: LATEST
+        LinuxParameters:
+          Devices:
+            - ContainerPath: /dev/fuse
+              HostPath: /dev/fuse
         LogConfiguration:
           LogDriver: awslogs
           Options:
@@ -59,7 +59,7 @@ Resources:
             awslogs-stream-prefix: !Ref EcrRepositoryName
       PropagateTags: true
       PlatformCapabilities:
-        - FARGATE   # EC2
+        - EC2   # FARGATE
       RetryStrategy:
         Attempts: 5
         EvaluateOnExit:

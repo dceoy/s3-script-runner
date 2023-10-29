@@ -6,14 +6,16 @@ ADD https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip /tmp/awscli.zip
 RUN set -e \
       && dnf -y upgrade \
       && dnf install -y --allowerasing \
-        ca-certificates curl jq time tree unzip wget /tmp/mount-s3.rpm \
+        ca-certificates curl jq util-linux time tree unzip wget \
+        /tmp/mount-s3.rpm \
       && dnf -y autoremove \
       && dnf clean all \
       && rm -rf /var/cache/dnf /tmp/mount-s3.rpm
 
 RUN set -e \
       && unzip -d /tmp /tmp/awscli.zip \
-      && /tmp/aws/install
+      && /tmp/aws/install \
+      && rm -rf /tmp/aws /tmp/awscli.zip
 
 ADD executor-on-s3 /usr/local/bin/executor-on-s3
 

@@ -35,16 +35,7 @@ Installation
         ssr-dev-vpc-private-subnets-with-gateway-endpoints
     ```
 
-5.  Deploy stacks for VPC public subnets with NAT gateways.
-
-    ```sh
-    $ rain deploy \
-        --params ProjectName=ssr-dev,VpcStackName=ssr-dev-vpc-private-subnets-with-gateway-endpoints,NumberOfAvailabilityZones=1 \
-        aws-cfn-vpc-for-slc/vpc-public-subnets-with-nat-gateways.cfn.yml \
-        ssr-dev-vpc-public-subnets-with-nat-gateways
-    ```
-
-6.  Deploy stacks for Batch.
+5.  Deploy stacks for Batch.
 
     ```sh
     $ rain deploy \
@@ -52,7 +43,7 @@ Installation
         batch-environments-and-queues.cfn.yml ssr-dev-batch-environments-and-queues
     ```
 
-7.  Deploy stacks for ECR and CodeBuild.
+6.  Deploy stacks for ECR and CodeBuild.
 
     ```sh
     $ rain deploy \
@@ -61,9 +52,9 @@ Installation
         ssr-dev-ecr-repository-and-codebuild-project
     ```
 
-8.  Push the repository to CodeCommit.
+7.  Push the repository to CodeCommit.
 
-9.  Register a Batch job definition.
+8.  Register a Batch job definition.
 
     ```sh
     $ rain deploy \
@@ -71,13 +62,46 @@ Installation
         batch-job-definition.cfn.yml ssr-dev-batch-job-definition
     ```
 
-Usage
------
-
-1.  Upload a script to S3.
+9.  Deploy stacks for VPC public subnets with NAT gateways.
 
     ```sh
-    $ aws s3 cp test/test.sh s3://ssr-io-012345678901/
+    $ rain deploy \
+        --params ProjectName=ssr-dev,VpcStackName=ssr-dev-vpc-private-subnets-with-gateway-endpoints,NumberOfAvailabilityZones=1 \
+        aws-cfn-vpc-for-slc/vpc-public-subnets-with-nat-gateways.cfn.yml \
+        ssr-dev-vpc-public-subnets-with-nat-gateways
     ```
 
-2.  Submit a Batch job.
+Test
+----
+
+1.  Execute the test script using shUnit2.
+
+    ```sh
+    $ cd ./test
+    $ ./test_batch_job.sh
+    ```
+
+2.  Remove test data on S3 and temporary data.
+
+    ```sh
+    $ ./cleanup.sh
+    ```
+
+Cleanup
+-------
+
+1.  Remove data on ECR.
+
+    ```sh
+    $ ./test/delete_ecr_images.sh
+    ```
+
+2.  Delete CloudFormation stacks.
+
+    ```sh
+    $ aws cloudformation describe-stacks \
+        --query "reverse(Stacks[?starts_with(StackName, 'ssr-dev-')]|sort_by(@, &CreationTime))[].StackName" \
+        --output text \
+        | tr '\t' '\n' \
+        | xargs -t -L1 rain rm -y
+    ```

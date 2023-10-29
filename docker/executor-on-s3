@@ -142,7 +142,7 @@ echo_n_eval "${SSR_COMMAND[@]}" \
   || SSR_COMMAND_EXIT_CODE="${?}"
 
 echo
-echo_n_eval "umount-s3 ${SSR_MOUNT_S3_DIRECTORY}"
+echo_n_eval "umount ${SSR_MOUNT_S3_DIRECTORY}"
 elapsed_seconds=$(( $(date +%s) - SSR_START_DATE ))
 echo "TOTAL_ELAPSED_TIME:     $(date --date=@${elapsed_seconds} -u +%H:%M:%S)"
 echo "COMMAND_EXIT_CODE:      ${SSR_COMMAND_EXIT_CODE}"

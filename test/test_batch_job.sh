@@ -16,9 +16,9 @@ BATCH_JOB_DEFINITION="$( \
     | cut -d / -f 2
 )"
 BATCH_SUBMIT_JOB_JSON="${BATCH_SUBMIT_JOB_JSON:-batch.submit-job.j2.json}"
-TEST_SCRIPT="${TEST_SCRIPT:-commands.sh}"
-TEST_OUTPUT_FILE='commands_output.txt'
-PLATFORM="${PLATFORM:-fargate}"
+TEST_SCRIPT="${TEST_SCRIPT:-example_commands.sh}"
+TEST_OUTPUT_FILE="$(basename "${TEST_SCRIPT}").output.txt"
+PLATFORM="${PLATFORM:-ec2}"
 TMP_BATCH_SUBMIT_JOB_JSON="tmp.${BATCH_JOB_DEFINITION%:*}.${BATCH_SUBMIT_JOB_JSON##*/}"
 TMP_BATCH_SUBMIT_JOB_OUTPUT_JSON="${TMP_BATCH_SUBMIT_JOB_JSON%.*}.output.json"
 

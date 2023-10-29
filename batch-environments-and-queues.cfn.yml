@@ -34,16 +34,44 @@ Conditions:
       - !Ref NumberOfAvailabilityZones
       - 3
 Resources:
-  BatchComputeEnvironmentFargateIntelSpot:
+  Ec2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${ProjectName}-ec2-launch-template
+      LaunchTemplateData:
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 1000
+              VolumeType: gp3
+              Iops: 16000
+              Throughput: 500
+              Encrypted: true
+              DeleteOnTermination: true
+        InstanceInitiatedShutdownBehavior: terminate
+      TagSpecifications:
+        - ResourceType: launch-template
+          Tags:
+            - Key: Name
+              Value: !Sub ${ProjectName}-ec2-launch-template
+            - Key: ProjectName
+              Value: !Ref ProjectName
+  BatchComputeEnvironmentEc2IntelSpot:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
       Type: MANAGED
-      ComputeEnvironmentName: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-spot
+      ComputeEnvironmentName: !Sub ${ProjectName}-batch-compute-environment-ec2-intel-spot
       ComputeResources:
+        AllocationStrategy: SPOT_CAPACITY_OPTIMIZED
+        BidPercentage: 100
+        MinvCpus: 0
         MaxvCpus: 2048
         SecurityGroupIds:
           - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-DefaultSecurityGroup
-        Type: FARGATE_SPOT
+        Type: SPOT
+        LaunchTemplate:
+          LaunchTemplateId: !Ref Ec2LaunchTemplate
+          Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
         Subnets:
           Fn::If:
             - UseAvailabilityZone2
@@ -55,34 +83,49 @@ Resources:
                 - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
                   - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet1
                 - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+        Ec2Configuration:
+          - ImageType: ECS_AL2
+        InstanceRole:
+          Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchEc2IamInstanceProfileArn
+        SpotIamFleetRole:
+          Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchSpotFleetIamRoleArn
+        InstanceTypes:
+          - m6i
+          - c6i
+          - r6i
       ServiceRole:
         Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchServiceIamRoleArn
       State: ENABLED
       Tags:
-        Name: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-spot
+        Name: !Sub ${ProjectName}-batch-compute-environment-ec2-intel-spot
         ProjectName: !Ref ProjectName
-  BatchJobQueueFargateIntelSpot:
+  BatchJobQueueEc2IntelSpot:
     Type: AWS::Batch::JobQueue
     Properties:
-      JobQueueName: !Sub ${ProjectName}-batch-job-queue-fargate-intel-spot
+      JobQueueName: !Sub ${ProjectName}-batch-job-queue-ec2-intel-spot
       ComputeEnvironmentOrder:
         - Order: 1
-          ComputeEnvironment: !Ref BatchComputeEnvironmentFargateIntelSpot
+          ComputeEnvironment: !Ref BatchComputeEnvironmentEc2IntelSpot
       Priority: 1
       State: ENABLED
       Tags:
-        Name: !Sub ${ProjectName}-batch-job-queue-fargate-intel-spot
+        Name: !Sub ${ProjectName}-batch-job-queue-ec2-intel-spot
         ProjectName: !Ref ProjectName
-  BatchComputeEnvironmentFargateIntelOnDemand:
+  BatchComputeEnvironmentEc2IntelOnDemand:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
       Type: MANAGED
-      ComputeEnvironmentName: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-ondemand
+      ComputeEnvironmentName: !Sub ${ProjectName}-batch-compute-environment-ec2-intel-ondemand
       ComputeResources:
+        AllocationStrategy: BEST_FIT
+        MinvCpus: 0
         MaxvCpus: 2048
         SecurityGroupIds:
           - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-DefaultSecurityGroup
-        Type: FARGATE
+        Type: EC2
+        LaunchTemplate:
+          LaunchTemplateId: !Ref Ec2LaunchTemplate
+          Version: !GetAtt Ec2LaunchTemplate.LatestVersionNumber
         Subnets:
           Fn::If:
             - UseAvailabilityZone2
@@ -94,23 +137,31 @@ Resources:
                 - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
                   - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet1
                 - - Fn::ImportValue: !Sub ${AWS::Region}-${VpcStackName}-PrivateSubnet0
+        Ec2Configuration:
+          - ImageType: ECS_AL2
+        InstanceRole:
+          Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchEc2IamInstanceProfileArn
+        InstanceTypes:
+          - m6i
+          - c6i
+          - r6i
       ServiceRole:
         Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchServiceIamRoleArn
       State: ENABLED
       Tags:
-        Name: !Sub ${ProjectName}-batch-compute-environment-fargate-intel-ondemand
+        Name: !Sub ${ProjectName}-batch-compute-environment-ec2-intel-ondemand
         ProjectName: !Ref ProjectName
-  BatchJobQueueFargateIntelOnDemand:
+  BatchJobQueueEc2IntelOnDemand:
     Type: AWS::Batch::JobQueue
     Properties:
-      JobQueueName: !Sub ${ProjectName}-batch-job-queue-fargate-intel-ondemand
+      JobQueueName: !Sub ${ProjectName}-batch-job-queue-ec2-intel-ondemand
       ComputeEnvironmentOrder:
         - Order: 1
-          ComputeEnvironment: !Ref BatchComputeEnvironmentFargateIntelOnDemand
+          ComputeEnvironment: !Ref BatchComputeEnvironmentEc2IntelOnDemand
       Priority: 1
       State: ENABLED
       Tags:
-        Name: !Sub ${ProjectName}-batch-job-queue-fargate-intel-ondemand
+        Name: !Sub ${ProjectName}-batch-job-queue-ec2-intel-ondemand
         ProjectName: !Ref ProjectName
   BatchLogGroup:
     Type: AWS::Logs::LogGroup
@@ -123,22 +174,22 @@ Resources:
         - Key: ProjectName
           Value: !Ref ProjectName
 Outputs:
-  BatchComputeEnvironmentFargateIntelSpot:
-    Value: !Ref BatchComputeEnvironmentFargateIntelSpot
+  BatchComputeEnvironmentEc2IntelSpot:
+    Value: !Ref BatchComputeEnvironmentEc2IntelSpot
     Export:
-      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchComputeEnvironmentFargateIntelSpot
-  BatchJobQueueFargateIntelSpot:
-    Value: !Ref BatchJobQueueFargateIntelSpot
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchComputeEnvironmentEc2IntelSpot
+  BatchJobQueueEc2IntelSpot:
+    Value: !Ref BatchJobQueueEc2IntelSpot
     Export:
-      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobQueueFargateIntelSpot
-  BatchComputeEnvironmentFargateIntelOnDemand:
-    Value: !Ref BatchComputeEnvironmentFargateIntelOnDemand
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobQueueEc2IntelSpot
+  BatchComputeEnvironmentEc2IntelOnDemand:
+    Value: !Ref BatchComputeEnvironmentEc2IntelOnDemand
     Export:
-      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchComputeEnvironmentFargateIntelOnDemand
-  BatchJobQueueFargateIntelOnDemand:
-    Value: !Ref BatchJobQueueFargateIntelOnDemand
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchComputeEnvironmentEc2IntelOnDemand
+  BatchJobQueueEc2IntelOnDemand:
+    Value: !Ref BatchJobQueueEc2IntelOnDemand
     Export:
-      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobQueueFargateIntelOnDemand
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobQueueEc2IntelOnDemand
   BatchLogGroup:
     Value: !Ref BatchLogGroup
     Export:

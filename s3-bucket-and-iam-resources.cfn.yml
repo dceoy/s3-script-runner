@@ -129,6 +129,69 @@ Resources:
           Value: !Sub ${ProjectName}-BatchJobExecutionIamRole
         - Key: ProjectName
           Value: !Ref ProjectName
+  BatchEc2InstanceIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-BatchEc2InstanceIamRole
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-ebs-access-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:createTags
+                  - ec2:createVolume
+                  - ec2:attachVolume
+                  - ec2:deleteVolume
+                  - ec2:modifyInstanceAttribute
+                  - ec2:describeVolumes
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-BatchEc2InstanceIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
+  BatchEc2IamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub ${ProjectName}-BatchEc2IamInstanceProfile
+      Path: /
+      Roles:
+        - !Ref BatchEc2InstanceIamRole
+  BatchSpotFleetIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-BatchSpotFleetIamRole
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - spotfleet.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-BatchSpotFleetIamRole
+        - Key: ProjectName
+          Value: !Ref ProjectName
   UserIamGroup:
     Type: AWS::IAM::Group
     Properties:
@@ -290,6 +353,18 @@ Outputs:
     Value: !GetAtt BatchJobIamRole.Arn
     Export:
       Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobIamRoleArn
+  BatchEc2InstanceIamRoleArn:
+    Value: !GetAtt BatchEc2InstanceIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchEc2InstanceIamRoleArn
+  BatchEc2IamInstanceProfileArn:
+    Value: !GetAtt BatchEc2IamInstanceProfile.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchEc2IamInstanceProfileArn
+  BatchSpotFleetIamRoleArn:
+    Value: !GetAtt BatchSpotFleetIamRole.Arn
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchSpotFleetIamRoleArn
   BatchJobExecutionIamRoleArn:
     Value: !GetAtt BatchJobExecutionIamRole.Arn
     Export:
