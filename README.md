@@ -11,7 +11,7 @@ Installation
 1.  Check out the repository.
 
     ```sh
-    $ git clone --recurse-submodules git@github.com:dceoy/s3-script-runner.git
+    $ git clone --recurse-submodules https://github.com/dceoy/s3-script-runner.git
     $ cd s3-script-runner
     ```
 

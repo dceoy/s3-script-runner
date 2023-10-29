@@ -8,10 +8,15 @@ services:
       context: .
       dockerfile: Dockerfile
     image: dceoy/executor-on-s3:latest
-    user: ${UID}:${GID}
-    userns_mode: host
-    volumes:
-      - .:/wd
-    working_dir: /wd
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse
+    environment:
+      MOUNT_S3_BUCKET: ssr-io-012345678901
+      MOUNT_S3_DIRECTORY: /mnt/s3
+      MOUNT_S3_OPTIONS: --allow-delete
     entrypoint:
       - /usr/local/bin/executor-on-s3
+    command:
+      - /mnt/s3/test.sh

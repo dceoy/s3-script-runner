@@ -12,7 +12,7 @@ Resources:
     # DeletionPolicy: Retain
     # UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub ${ProjectName}-main-${AWS::AccountId}
+      BucketName: !Sub ${ProjectName}-io-${AWS::AccountId}
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -37,7 +37,7 @@ Resources:
               DaysAfterInitiation: 7
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-${AWS::Region}-${AWS::AccountId}
+          Value: !Sub ${ProjectName}-io-${AWS::AccountId}
         - Key: ProjectName
           Value: !Ref ProjectName
   S3AccessIamPolicy:

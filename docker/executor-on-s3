@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+#
+# Command Executor on S3
+#
+# Usage:
+#   executor-on-s3 [--debug] [--dryrun] [--mount-s3-bucket=<name>]
+#       [--mount-s3-directory=<path>] (--mount-s3-option=<arg>)... <command>...
+#   executor-on-s3 --version
+#   executor-on-s3 -h|--help
+#
+# Options:
+#   --debug           Enable debug mode
+#   --dryrun          Print commands without execution
+#   --mount-s3-bucket=<name>
+#                     Specify the S3 bucket name (${MOUNT_S3_BUCKET})
+#   --mount-s3-directory=<path>
+#                     Specify the S3 directory path [default: /mnt/s3]
+#                     (${MOUNT_S3_DIRECTORY})
+#   --mount-s3-option=<arg>
+#                     Specify an option for `mount-s3`
+#                     (${MOUNT_S3_OPTIONS})
+#   --version         Print version information and exit
+#   -h, --help        Print this help text and exit
+#
+# Arguments:
+#   <command>           A command and arguments
+
+
+set -euo pipefail
+
+if [[ ${#} -ge 1 ]]; then
+  for a in "${@}"; do
+    [[ "${a}" = '--debug' ]] && set -x && break
+  done
+fi
+
+ARGV=("${*}")
+SSR_ENTRYPOINT_PATH=$(realpath "${0}")
+SSR_ENTRYPOINT_NAME=$(basename "${SSR_ENTRYPOINT_PATH}")
+SSR_ENTRYPOINT_VERSION='v0.0.1'
+SSR_DRYRUN=0
+SSR_MOUNT_S3_BUCKET="${MOUNT_S3_BUCKET:-}"
+SSR_MOUNT_S3_DIRECTORY="${MOUNT_S3_DIRECTORY:-/mnt/s3}"
+if [[ -n "${MOUNT_S3_OPTIONS:-}" ]]; then
+  IFS=' ' read -ra SSR_MOUNT_S3_OPTIONS <<< "${MOUNT_S3_OPTIONS}"
+else
+  SSR_MOUNT_S3_OPTIONS=()
+fi
+SSR_COMMAND=()
+SSR_START_DATE="$(date +%s)"
+
+function print_version {
+  echo -e "${SSR_ENTRYPOINT_NAME}: ${SSR_ENTRYPOINT_VERSION}"
+}
+
+function print_usage {
+  sed -ne '1,2d; /^#/!q; s/^#$/# /; s/^# //p;' "${SSR_ENTRYPOINT_PATH}"
+}
+
+function abort {
+  {
+    if [[ ${#} -eq 0 ]]; then
+      cat -
+    else
+      SSR_ENTRYPOINT_NAME=$(basename "${SSR_ENTRYPOINT_PATH}")
+      echo -e "${SSR_ENTRYPOINT_NAME}: ${*}"
+    fi
+  } >&2
+  exit 1
+}
+
+function echo_n_eval {
+  printf "[%s]  $ %s\n" "$(date)" "${*}"
+  if [[ ${SSR_DRYRUN} -eq 0 ]]; then
+    eval "${*}"
+  fi
+}
+
+while [[ ${#} -ge 1 ]]; do
+  {
+    case "${1}" in
+      -h | --help )
+        print_usage && exit 0
+        ;;
+      --version )
+        print_version && exit 0
+        ;;
+      --debug )
+        shift 1
+        ;;
+      --dryrun )
+        SSR_DRYRUN=1 && shift 1
+        ;;
+      --mount-s3-bucket )
+        SSR_MOUNT_S3_BUCKET="${2}" && shift 2
+        ;;
+      --mount-s3-bucket=* )
+        SSR_MOUNT_S3_BUCKET="${1#*\=}" && shift 1
+        ;;
+      --mount-s3-directory )
+        SSR_MOUNT_S3_DIRECTORY="${2}" && shift 2
+        ;;
+      --mount-s3-directory=* )
+        SSR_MOUNT_S3_DIRECTORY="${1#*\=}" && shift 1
+        ;;
+      --mount-s3-option )
+        SSR_MOUNT_S3_OPTIONS+=("${2}") && shift 2
+        ;;
+      --mount-s3-option=* )
+        SSR_MOUNT_S3_OPTIONS+=("${1#*\=}") && shift 1
+        ;;
+      -* )
+        abort "invalid option: ${1}"
+        ;;
+      * )
+        SSR_COMMAND=("${@:1}") && break
+        ;;
+      esac
+    } || exit 1
+done
+
+echo_n_log "ARGV:                   ${ARGV[*]}"
+echo_n_log "OSTYPE:                 ${OSTYPE}"
+echo_n_log "BASH:                   $(command -v bash)"
+echo_n_log "ENTRYPOINT:             ${SSR_ENTRYPOINT_PATH}"
+echo_n_log "PWD:                    ${PWD}"
+echo_n_log "MOUNT_S3_BUCKET:        ${SSR_MOUNT_S3_BUCKET[*]}"
+echo_n_log "MOUNT_S3_DIRECTORY:     ${SSR_MOUNT_S3_DIRECTORY}"
+echo_n_log "MOUNT_S3_OPTIONS:       ${SSR_MOUNT_S3_OPTIONS[*]}"
+if [[ ${#SSR_COMMAND[@]} -gt 0 ]]; then
+  echo_n_log "COMMAND:                ${SSR_COMMAND[*]}"
+else
+  abort "$(print_usage)"
+fi
+
+echo_n_eval "mkdir -p ${SSR_MOUNT_S3_DIRECTORY}"
+echo_n_eval "mount-s3 ${SSR_MOUNT_S3_OPTIONS[*]} ${SSR_MOUNT_S3_BUCKET} ${SSR_MOUNT_S3_DIRECTORY}"
+echo
+
+echo_n_eval "${SSR_COMMAND[@]}" \
+  && SSR_COMMAND_EXIT_CODE="${?}" \
+  || SSR_COMMAND_EXIT_CODE="${?}"
+
+echo
+echo_n_eval "umount-s3 ${SSR_MOUNT_S3_DIRECTORY}"
+elapsed_seconds=$(( $(date +%s) - SSR_START_DATE ))
+echo_n_log "TOTAL_ELAPSED_TIME:     $(date --date=@${elapsed_seconds} -u +%H:%M:%S)"
+echo_n_log "COMMAND_EXIT_CODE:      ${SSR_COMMAND_EXIT_CODE}"
+
+exit "${SSR_COMMAND_EXIT_CODE}"
