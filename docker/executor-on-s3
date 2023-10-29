@@ -50,7 +50,7 @@ SSR_COMMAND=()
 SSR_START_DATE="$(date +%s)"
 
 function print_version {
-  echo -e "${SSR_ENTRYPOINT_NAME}: ${SSR_ENTRYPOINT_VERSION}"
+  echo "${SSR_ENTRYPOINT_NAME}: ${SSR_ENTRYPOINT_VERSION}"
 }
 
 function print_usage {
@@ -63,7 +63,7 @@ function abort {
       cat -
     else
       SSR_ENTRYPOINT_NAME=$(basename "${SSR_ENTRYPOINT_PATH}")
-      echo -e "${SSR_ENTRYPOINT_NAME}: ${*}"
+      echo "${SSR_ENTRYPOINT_NAME}: ${*}"
     fi
   } >&2
   exit 1
@@ -119,16 +119,16 @@ while [[ ${#} -ge 1 ]]; do
     } || exit 1
 done
 
-echo_n_log "ARGV:                   ${ARGV[*]}"
-echo_n_log "OSTYPE:                 ${OSTYPE}"
-echo_n_log "BASH:                   $(command -v bash)"
-echo_n_log "ENTRYPOINT:             ${SSR_ENTRYPOINT_PATH}"
-echo_n_log "PWD:                    ${PWD}"
-echo_n_log "MOUNT_S3_BUCKET:        ${SSR_MOUNT_S3_BUCKET[*]}"
-echo_n_log "MOUNT_S3_DIRECTORY:     ${SSR_MOUNT_S3_DIRECTORY}"
-echo_n_log "MOUNT_S3_OPTIONS:       ${SSR_MOUNT_S3_OPTIONS[*]}"
+echo "ARGV:                   ${ARGV[*]}"
+echo "OSTYPE:                 ${OSTYPE}"
+echo "BASH:                   $(command -v bash)"
+echo "ENTRYPOINT:             ${SSR_ENTRYPOINT_PATH}"
+echo "PWD:                    ${PWD}"
+echo "MOUNT_S3_BUCKET:        ${SSR_MOUNT_S3_BUCKET[*]}"
+echo "MOUNT_S3_DIRECTORY:     ${SSR_MOUNT_S3_DIRECTORY}"
+echo "MOUNT_S3_OPTIONS:       ${SSR_MOUNT_S3_OPTIONS[*]}"
 if [[ ${#SSR_COMMAND[@]} -gt 0 ]]; then
-  echo_n_log "COMMAND:                ${SSR_COMMAND[*]}"
+  echo "COMMAND:                ${SSR_COMMAND[*]}"
 else
   abort "$(print_usage)"
 fi
@@ -144,7 +144,7 @@ echo_n_eval "${SSR_COMMAND[@]}" \
 echo
 echo_n_eval "umount-s3 ${SSR_MOUNT_S3_DIRECTORY}"
 elapsed_seconds=$(( $(date +%s) - SSR_START_DATE ))
-echo_n_log "TOTAL_ELAPSED_TIME:     $(date --date=@${elapsed_seconds} -u +%H:%M:%S)"
-echo_n_log "COMMAND_EXIT_CODE:      ${SSR_COMMAND_EXIT_CODE}"
+echo "TOTAL_ELAPSED_TIME:     $(date --date=@${elapsed_seconds} -u +%H:%M:%S)"
+echo "COMMAND_EXIT_CODE:      ${SSR_COMMAND_EXIT_CODE}"
 
 exit "${SSR_COMMAND_EXIT_CODE}"

@@ -21,7 +21,7 @@ Resources:
       JobDefinitionName: !Ref EcrRepositoryName
       Type: container
       ContainerProperties:
-        Image: !Ref EcrRepositoryName
+        Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepositoryName}
         Command:
           - --version
         JobRoleArn:

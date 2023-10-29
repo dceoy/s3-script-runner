@@ -110,7 +110,7 @@ Resources:
             Value: !Ref DockerHubToken
       Source:
         Type: CODECOMMIT
-        Location: !GetAtt CodeCommitRepository.Arn
+        Location: !GetAtt CodeCommitRepository.CloneUrlHttp
         GitCloneDepth: 1
         GitSubmodulesConfig:
           FetchSubmodules: true
@@ -127,7 +127,7 @@ Resources:
                 - echo 'Logging in to Amazon ECR...'
                 - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
                 - |
-                  if [ -n "${DOCKERHUB_USER}" ] && [ -n "${DOCKERHUB_TOKEN}" ]; then
+                  if [[ -n "${DOCKERHUB_USER}" ]] && [[ -n "${DOCKERHUB_TOKEN}" ]]; then
                     echo 'Logging in to Docker Hub...'
                     echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USER}" --password-stdin
                   fi
