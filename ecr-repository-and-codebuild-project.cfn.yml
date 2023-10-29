@@ -70,10 +70,10 @@ Resources:
   CodeCommitRepository:
     Type: AWS::CodeCommit::Repository
     Properties:
-      RepositoryName: !Ref EcrRepositoryName
+      RepositoryName: !Sub ${ProjectName}-codecommit-repository
       Tags:
         - Key: Name
-          Value: !Ref EcrRepositoryName
+          Value: !Sub ${ProjectName}-codecommit-repository
         - Key: ProjectName
           Value: !Ref ProjectName
   CodeBuildProject:
@@ -81,7 +81,7 @@ Resources:
     Properties:
       Name: !Sub ${ProjectName}-codebuild-project
       ServiceRole:
-        Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-CodeBuildServiceRole
+        Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-CodeBuildServiceIamRole
       Artifacts:
         Type: NO_ARTIFACTS
       Environment:
@@ -188,7 +188,7 @@ Resources:
       Targets:
         - Arn: !GetAtt CodeBuildProject.Arn
           RoleArn:
-            Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-CodeBuildEventsRole
+            Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-CodeBuildEventsIamRole
           Id: !Sub ${ProjectName}-codecommit-to-codebuild
 Outputs:
   CodeCommitRepository:

@@ -60,3 +60,24 @@ Installation
         ecr-repository-and-codebuild-project.cfn.yml \
         ssr-dev-ecr-repository-and-codebuild-project
     ```
+
+8.  Push the repository to CodeCommit.
+
+9.  Register a Batch job definition.
+
+    ```sh
+    $ rain deploy \
+        --params ProjectName=ssr-dev,IamStackName=ssr-dev-s3-bucket-and-iam-resources \
+        batch-job-definition.cfn.yml ssr-dev-batch-job-definition
+    ```
+
+Usage
+-----
+
+1.  Upload a script to S3.
+
+    ```sh
+    $ aws s3 cp test/test.sh s3://ssr-io-012345678901/
+    ```
+
+2.  Submit a Batch job.

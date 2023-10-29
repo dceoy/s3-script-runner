@@ -1,0 +1,79 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: Batch job definition
+Parameters:
+  ProjectName:
+    Description: Set the project name.
+    Type: String
+    Default: ssr
+  EcrRepositoryName:
+    Description: Set the ECR repository name.
+    Type: String
+    Default: executor-on-s3
+  IamStackName:
+    Description: Set the IAM stack name.
+    Type: String
+    Default: s3-bucket-and-iam-resources
+Resources:
+  BatchJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: !Ref EcrRepositoryName
+      Type: container
+      ContainerProperties:
+        Image: !Ref EcrRepositoryName
+        Command:
+          - --version
+        JobRoleArn:
+          Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchJobIamRoleArn
+        ExecutionRoleArn:
+          Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-BatchJobExecutionIamRoleArn
+        Environment:
+          - Name: MOUNT_S3_BUCKET
+            Value:
+              Fn::ImportValue: !Sub ${AWS::Region}-${IamStackName}-S3Bucket
+          - Name: MOUNT_S3_DIRECTORY
+            Value: /mnt/s3
+        ReadonlyRootFilesystem: false
+        # Privileged: true
+        User: root
+        ResourceRequirements:
+          - Type: VCPU
+            Value: 0.25
+          - Type: MEMORY
+            Value: 512
+        EphemeralStorage:
+          SizeInGiB: 200
+        NetworkConfiguration:
+          AssignPublicIp: DISABLED
+        FargatePlatformConfiguration:
+          PlatformVersion: LATEST
+        # LinuxParameters:
+        #   Devices:
+        #     - ContainerPath: /dev/fuse
+        #       HostPath: /dev/fuse
+        LogConfiguration:
+          LogDriver: awslogs
+          Options:
+            awslogs-group: !Sub /aws/batch/${ProjectName}-batch-job
+            awslogs-stream-prefix: !Ref EcrRepositoryName
+      PropagateTags: true
+      PlatformCapabilities:
+        - FARGATE   # EC2
+      RetryStrategy:
+        Attempts: 5
+        EvaluateOnExit:
+          - Action: RETRY
+            OnStatusReason: Host EC2*
+          - Action: EXIT
+            OnReason: '*'
+      Timeout:
+        AttemptDurationSeconds: 1209600
+      Tags:
+        Name: !Ref EcrRepositoryName
+        ProjectName: !Ref ProjectName
+Outputs:
+  BatchJobDefinition:
+    Value: !Ref BatchJobDefinition
+    Export:
+      Name: !Sub ${AWS::Region}-${AWS::StackName}-BatchJobDefinition

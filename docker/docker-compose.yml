@@ -8,10 +8,12 @@ services:
       context: .
       dockerfile: Dockerfile
     image: dceoy/executor-on-s3:latest
-    cap_add:
-      - SYS_ADMIN
     devices:
       - /dev/fuse:/dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
     environment:
       MOUNT_S3_BUCKET: ssr-io-012345678901
       MOUNT_S3_DIRECTORY: /mnt/s3
