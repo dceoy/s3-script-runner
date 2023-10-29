@@ -1,0 +1,29 @@
+{
+  "jobName": "test-sh",
+  "jobDefinition": "{{ job_definition }}",
+  "jobQueue": "{{ job_queue }}",
+  "containerOverrides": {
+    "command": [
+      "--version"
+    ],
+    "environment": [
+      {
+        "name": "MOUNT_S3_OPTIONS",
+        "value": "--allow-delete --dir-mode=0755 --file-mode=0755"
+      }
+    ],
+    "resourceRequirements": [
+      {
+        "type": "MEMORY",
+        "value": "2048"
+      },
+      {
+        "type": "VCPU",
+        "value": "1"
+      }
+    ]
+  },
+  "timeout": {
+    "attemptDurationSeconds": 86400
+  }
+}

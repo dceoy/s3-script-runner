@@ -17,7 +17,7 @@ services:
     environment:
       MOUNT_S3_BUCKET: ssr-io-012345678901
       MOUNT_S3_DIRECTORY: /mnt/s3
-      MOUNT_S3_OPTIONS: --allow-delete --dir-mode=0755 --file-mode=0644
+      MOUNT_S3_OPTIONS: --allow-delete --dir-mode=0755 --file-mode=0755
     entrypoint:
       - /usr/local/bin/executor-on-s3
     command:
