@@ -8,12 +8,15 @@ AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 MOUNT_S3_BUCKET="${MOUNT_S3_BUCKET:-${PROJECT_NAME}-io-${AWS_ACCOUNT_ID}}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-3600}"
 # shellcheck disable=SC2016
-BATCH_JOB_DEFINITION="$( \
-  aws cloudformation describe-stacks \
-    --query 'Stacks[0].Outputs[?OutputKey==`BatchJobDefinition`].OutputValue' \
+BATCH_JOB_DEFINITION="${IMAGE_NAME}:$( \
+  aws batch describe-job-definitions \
+    --region "${AWS_REGION}" \
+    --job-definition-name "${IMAGE_NAME}" \
+    --status ACTIVE \
+    --query 'jobDefinitions[*].revision' \
     --output text \
-    --stack-name ssr-dev-batch-job-definition \
-    | cut -d / -f 2
+    | tr '\t' '\n' \
+    | head -1
 )"
 BATCH_SUBMIT_JOB_JSON="${BATCH_SUBMIT_JOB_JSON:-batch.submit-job.j2.json}"
 TEST_SCRIPT="${TEST_SCRIPT:-example_commands.sh}"
@@ -46,7 +49,9 @@ testBatchJobSubmit() {
     | jq ".containerOverrides.command[0]=\"/mnt/s3/tmp/${IMAGE_NAME}/${TEST_SCRIPT}\"" \
     | jq ".containerOverrides.command[1]=\"/mnt/s3/tmp/${IMAGE_NAME}/${TEST_OUTPUT_FILE}\"" \
     > "${TMP_BATCH_SUBMIT_JOB_JSON}"
-  aws batch submit-job --cli-input-json "file://${TMP_BATCH_SUBMIT_JOB_JSON}" \
+  aws batch submit-job \
+    --region "${AWS_REGION}" \
+    --cli-input-json "file://${TMP_BATCH_SUBMIT_JOB_JSON}" \
     | tee "${TMP_BATCH_SUBMIT_JOB_OUTPUT_JSON}"
   assertEquals 'aws batch submit-job' 0 "${PIPESTATUS[0]}"
 }
@@ -57,7 +62,8 @@ testBatchJobStatus() {
   [[ -n "${ji}" ]] || exit 1
   js=''
   while [[ ${SECONDS} -lt ${end_seconds} ]]; do
-    aws batch describe-jobs --jobs "${ji}" > "tmp.${ji}.batch.describe-jobs.output.json"
+    aws batch describe-jobs --region "${AWS_REGION}" --jobs "${ji}" \
+      > "tmp.${ji}.batch.describe-jobs.output.json"
     js=$(jq -r '.jobs[0].status' < "tmp.${ji}.batch.describe-jobs.output.json")
     [[ -n "${js}" ]] || exit 1
     if [[ "${js}" == 'SUCCEEDED' ]] || [[ "${js}" == 'FAILED' ]]; then
